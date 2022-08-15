@@ -1,6 +1,19 @@
 dependencies {
-	compileOnly group: "com.liferay", name: "com.liferay.style.book.api"
-	compileOnly group: "com.liferay.portal", name: "release.dxp.api"
+	compileOnly group: "com.liferay.portal", name: "com.liferay.portal.impl", version: "default"
+	compileOnly group: "com.liferay.portal", name: "com.liferay.portal.kernel", version: "default"
+	compileOnly group: "org.apache.felix", name: "org.apache.felix.http.servlet-api", version: "1.1.2"
+	compileOnly group: "org.osgi", name: "org.osgi.service.component.annotations", version: "1.3.0"
+	compileOnly group: "org.osgi", name: "osgi.core", version: "6.0.0"
+
+	compileOnly group: "com.liferay", name: "com.liferay.fragment.api"
+	compileOnly group: "com.liferay", name: "com.liferay.layout.api"
+	compileOnly group: "com.liferay", name: "com.liferay.layout.page.template.api"
+	compileOnly group: "com.liferay", name: "com.liferay.portal.instance.lifecycle.api"
+	compileOnly group: "com.liferay", name: "com.liferay.segments.api"
+	compileOnly group: "com.liferay", name: "com.liferay.site.api"
+	compileOnly group: "com.liferay", name: "com.liferay.petra.string"
+	compileOnly group: "com.liferay", name: "com.liferay.petra.function"
+
 }
 
 jar.from "classes"

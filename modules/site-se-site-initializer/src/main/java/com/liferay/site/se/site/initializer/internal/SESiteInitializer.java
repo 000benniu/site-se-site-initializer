@@ -14,34 +14,14 @@
 
 package com.liferay.site.se.site.initializer.internal;
 
-import com.liferay.asset.display.page.constants.AssetDisplayPageConstants;
-import com.liferay.asset.display.page.service.AssetDisplayPageEntryLocalService;
-import com.liferay.asset.list.model.AssetListEntry;
-import com.liferay.asset.list.service.AssetListEntryLocalService;
-import com.liferay.document.library.util.DLURLHelper;
-import com.liferay.dynamic.data.mapping.constants.DDMTemplateConstants;
-import com.liferay.dynamic.data.mapping.model.DDMStructure;
-import com.liferay.dynamic.data.mapping.service.DDMStructureLocalService;
-import com.liferay.dynamic.data.mapping.service.DDMTemplateLocalService;
-import com.liferay.dynamic.data.mapping.util.DefaultDDMStructureHelper;
-import com.liferay.journal.constants.JournalArticleConstants;
-import com.liferay.journal.constants.JournalFolderConstants;
-import com.liferay.journal.model.JournalArticle;
-import com.liferay.journal.model.JournalFolder;
-import com.liferay.journal.service.JournalArticleLocalService;
-import com.liferay.journal.service.JournalFolderLocalService;
-import com.liferay.layout.page.template.constants.LayoutPageTemplateExportImportConstants;
 import com.liferay.layout.page.template.importer.LayoutPageTemplatesImporter;
-import com.liferay.layout.page.template.model.LayoutPageTemplateEntry;
 import com.liferay.layout.page.template.model.LayoutPageTemplateStructure;
-import com.liferay.layout.page.template.service.LayoutPageTemplateEntryLocalService;
 import com.liferay.layout.page.template.service.LayoutPageTemplateStructureLocalService;
 import com.liferay.layout.util.LayoutCopyHelper;
 import com.liferay.layout.util.structure.LayoutStructure;
-import com.liferay.petra.string.StringBundler;
+import com.liferay.petra.string.CharPool;
 import com.liferay.petra.string.StringPool;
 import com.liferay.portal.kernel.exception.PortalException;
-import com.liferay.portal.kernel.json.JSONArray;
 import com.liferay.portal.kernel.json.JSONFactoryUtil;
 import com.liferay.portal.kernel.json.JSONObject;
 import com.liferay.portal.kernel.language.LanguageUtil;
@@ -50,57 +30,43 @@ import com.liferay.portal.kernel.log.LogFactoryUtil;
 import com.liferay.portal.kernel.model.Group;
 import com.liferay.portal.kernel.model.Layout;
 import com.liferay.portal.kernel.model.LayoutConstants;
-import com.liferay.portal.kernel.model.Theme;
+import com.liferay.portal.kernel.model.LayoutSet;
+import com.liferay.portal.kernel.model.LayoutTypePortlet;
+import com.liferay.portal.kernel.model.Repository;
+import com.liferay.portal.kernel.model.Role;
 import com.liferay.portal.kernel.model.User;
+import com.liferay.portal.kernel.model.role.RoleConstants;
+import com.liferay.portal.kernel.portletfilerepository.PortletFileRepository;
 import com.liferay.portal.kernel.repository.model.FileEntry;
 import com.liferay.portal.kernel.security.auth.PrincipalThreadLocal;
+import com.liferay.portal.kernel.service.GroupLocalService;
 import com.liferay.portal.kernel.service.LayoutLocalService;
+import com.liferay.portal.kernel.service.LayoutSetLocalService;
+import com.liferay.portal.kernel.service.RoleLocalService;
 import com.liferay.portal.kernel.service.ServiceContext;
-import com.liferay.portal.kernel.service.ThemeLocalService;
+import com.liferay.portal.kernel.service.ServiceContextThreadLocal;
 import com.liferay.portal.kernel.service.UserLocalService;
-import com.liferay.portal.kernel.template.TemplateConstants;
-import com.liferay.portal.kernel.util.ArrayUtil;
-import com.liferay.portal.kernel.util.CalendarFactoryUtil;
 import com.liferay.portal.kernel.util.FileUtil;
+import com.liferay.portal.kernel.util.FriendlyURLNormalizerUtil;
 import com.liferay.portal.kernel.util.HashMapBuilder;
-import com.liferay.portal.kernel.util.KeyValuePair;
-import com.liferay.portal.kernel.util.ListUtil;
 import com.liferay.portal.kernel.util.LocaleUtil;
-import com.liferay.portal.kernel.util.Portal;
+import com.liferay.portal.kernel.util.MimeTypesUtil;
+import com.liferay.portal.kernel.util.ReleaseInfo;
 import com.liferay.portal.kernel.util.StringUtil;
-import com.liferay.portal.kernel.util.UnicodeProperties;
 import com.liferay.portal.kernel.util.Validator;
 import com.liferay.portal.kernel.workflow.WorkflowConstants;
-import com.liferay.portal.kernel.zip.ZipWriter;
-import com.liferay.portal.kernel.zip.ZipWriterFactoryUtil;
-import com.liferay.portlet.display.template.PortletDisplayTemplate;
+import com.liferay.portal.util.PropsValues;
 import com.liferay.segments.constants.SegmentsExperienceConstants;
 import com.liferay.site.exception.InitializationException;
 import com.liferay.site.initializer.SiteInitializer;
-import com.liferay.site.navigation.menu.item.layout.constants.SiteNavigationMenuItemTypeConstants;
-import com.liferay.site.navigation.model.SiteNavigationMenu;
-import com.liferay.site.navigation.service.SiteNavigationMenuItemLocalService;
-import com.liferay.site.navigation.service.SiteNavigationMenuLocalService;
-import com.liferay.site.navigation.type.SiteNavigationMenuItemType;
-import com.liferay.site.navigation.type.SiteNavigationMenuItemTypeRegistry;
-import com.liferay.site.se.site.initializer.internal.util.ImagesImporterUtil;
-import com.liferay.site.se.site.initializer.internal.util.StyleBookEntriesImporterUtil;
-import com.liferay.style.book.model.StyleBookEntry;
-import com.liferay.style.book.service.StyleBookEntryLocalService;
 
-import java.io.File;
-import java.io.IOException;
+import java.io.InputStream;
 
 import java.net.URL;
 
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.Enumeration;
-import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 
 import javax.servlet.ServletContext;
@@ -112,7 +78,7 @@ import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
 
 /**
- * @author evanthibodeau
+ * @author Jürgen Kappler
  */
 @Component(
 	immediate = true,
@@ -125,8 +91,7 @@ public class SESiteInitializer implements SiteInitializer {
 
 	@Override
 	public String getDescription(Locale locale) {
-		return "A site template that includes demo resources for Liferay " +
-			"sales engineers.";
+		return null;
 	}
 
 	@Override
@@ -136,43 +101,18 @@ public class SESiteInitializer implements SiteInitializer {
 
 	@Override
 	public String getName(Locale locale) {
-		return "SE Demo Site";
+		return null;
 	}
 
 	@Override
 	public String getThumbnailSrc() {
-		return _servletContext.getContextPath() + "/images/thumbnail.png";
+		return null;
 	}
 
 	@Override
 	public void initialize(long groupId) throws InitializationException {
 		try {
-			_createServiceContext(groupId);
-
-			_addDLFileEntries();
-
-			_addDDMStructures();
-
-			_addDDMTemplates();
-
-			_addWidgetTemplates();
-
-			_addJournalArticles(_addJournalFolders());
-
-			_addAssetListEntries();
-			_addSiteNavigationMenus();
-
-			_addStyleBookEntries();
-
-			_setDefaultStyleBookEntry();
-
-			_createLayoutNameURLMap();
-
-			_addLayoutPageTemplateEntries();
-
-			_setDefaultLayoutPageTemplateEntries();
-
-			_addLayouts();
+			_addDefaultGuestPublicLayout(groupId);
 		}
 		catch (Exception exception) {
 			_log.error(exception, exception);
@@ -183,7 +123,7 @@ public class SESiteInitializer implements SiteInitializer {
 
 	@Override
 	public boolean isActive(long companyId) {
-		return true;
+		return false;
 	}
 
 	@Activate
@@ -191,1033 +131,253 @@ public class SESiteInitializer implements SiteInitializer {
 		_bundle = bundleContext.getBundle();
 	}
 
-	private void _addAssetListEntries() throws Exception {
-		Enumeration<URL> enumeration = _bundle.findEntries(
-			_PATH + "/asset-list-entries", "asset-list-entry.json", true);
+	private void _addDefaultGuestPublicLayout(long groupId)
+		throws PortalException {
 
-		while (enumeration.hasMoreElements()) {
-			URL url = enumeration.nextElement();
+		Group group = _groupLocalService.getGroup(groupId);
 
-			JSONObject ddmTemplateJSONObject = JSONFactoryUtil.createJSONObject(
-				StringUtil.read(url.openStream()));
+		User user = _getUser(group.getCompanyId());
 
-			long classNameId = _portal.getClassNameId(
-				ddmTemplateJSONObject.getString("className"));
+		String friendlyURL = FriendlyURLNormalizerUtil.normalizeWithEncoding(
+			PropsValues.DEFAULT_GUEST_PUBLIC_LAYOUT_FRIENDLY_URL);
 
-			String ddmStructureKey = ddmTemplateJSONObject.getString(
-				"ddmStructureKey");
-			String name = ddmTemplateJSONObject.getString("name");
-
-			_assetListEntryLocalService.addDynamicAssetListEntry(
-				_serviceContext.getUserId(), _serviceContext.getScopeGroupId(),
-				name,
-				_getDynamicCollectionTypeSettings(
-					ddmStructureKey, classNameId, null),
-				_serviceContext);
-		}
-	}
-
-	private Layout _addContentLayout(
-			JSONObject pageJSONObject, JSONObject pageDefinitionJSONObject,
-			Map<String, String> resourcesMap)
-		throws Exception {
-
-		String name = pageJSONObject.getString("name");
-		String type = StringUtil.toLowerCase(pageJSONObject.getString("type"));
+		ServiceContext serviceContext = new ServiceContext();
 
 		Layout layout = _layoutLocalService.addLayout(
-			_serviceContext.getUserId(), _serviceContext.getScopeGroupId(),
-			pageJSONObject.getBoolean("private"),
+			user.getUserId(), group.getGroupId(), false,
 			LayoutConstants.DEFAULT_PARENT_LAYOUT_ID,
-			HashMapBuilder.put(
-				LocaleUtil.getSiteDefault(), name
-			).build(),
-			new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(),
-			type, null, false, false, new HashMap<>(), _serviceContext);
+			PropsValues.DEFAULT_GUEST_PUBLIC_LAYOUT_NAME, StringPool.BLANK,
+			StringPool.BLANK, LayoutConstants.TYPE_CONTENT, false, friendlyURL,
+			serviceContext);
 
 		Layout draftLayout = layout.fetchDraftLayout();
 
-		_importPageDefinition(draftLayout, pageDefinitionJSONObject);
+		String currentName = PrincipalThreadLocal.getName();
+		ServiceContext currentServiceContext =
+			ServiceContextThreadLocal.popServiceContext();
 
-		if (Objects.equals(LayoutConstants.TYPE_COLLECTION, type)) {
-			UnicodeProperties typeSettingsUnicodeProperties =
-				draftLayout.getTypeSettingsProperties();
-
-			typeSettingsUnicodeProperties.setProperty(
-				"collectionPK",
-				resourcesMap.get(pageJSONObject.getString("collectionKey")));
-			typeSettingsUnicodeProperties.setProperty(
-				"collectionType",
-				"com.liferay.item.selector.criteria." +
-					"InfoListItemSelectorReturnType");
-
-			draftLayout = _layoutLocalService.updateLayout(
-				_serviceContext.getScopeGroupId(),
-				draftLayout.isPrivateLayout(), draftLayout.getLayoutId(),
-				typeSettingsUnicodeProperties.toString());
-		}
-
-		draftLayout = _updateLayoutTypeSettings(
-			draftLayout, pageDefinitionJSONObject.getJSONObject("settings"));
-
-		layout = _layoutCopyHelper.copyLayout(draftLayout, layout);
-
-		_layoutLocalService.updateStatus(
-			layout.getUserId(), layout.getPlid(),
-			WorkflowConstants.STATUS_APPROVED, _serviceContext);
-
-		_layoutLocalService.updateStatus(
-			layout.getUserId(), draftLayout.getPlid(),
-			WorkflowConstants.STATUS_APPROVED, _serviceContext);
-
-		return layout;
-	}
-
-	private void _addDDMStructures() throws Exception {
-		Enumeration<URL> enumeration = _bundle.findEntries(
-			_PATH + "/ddm-structures", StringPool.STAR, false);
-
-		Class<?> clazz = getClass();
-
-		while (enumeration.hasMoreElements()) {
-			URL url = enumeration.nextElement();
-
-			_defaultDDMStructureHelper.addDDMStructures(
-				_serviceContext.getUserId(), _serviceContext.getScopeGroupId(),
-				_portal.getClassNameId(JournalArticle.class),
-				clazz.getClassLoader(), url.getPath(), _serviceContext);
-		}
-	}
-
-	private void _addDDMTemplates() throws Exception {
-		long resourceClassNameId = _portal.getClassNameId(JournalArticle.class);
-
-		Enumeration<URL> enumeration = _bundle.findEntries(
-			_PATH + "/ddm-templates", "ddm_template.json", true);
-
-		while (enumeration.hasMoreElements()) {
-			URL url = enumeration.nextElement();
-
-			JSONObject ddmTemplateJSONObject = JSONFactoryUtil.createJSONObject(
-				StringUtil.read(url.openStream()));
-
-			DDMStructure ddmStructure = _fetchJournalDDMStructure(
-				ddmTemplateJSONObject.getString("ddmStructureKey"));
-
-			_ddmTemplateLocalService.addTemplate(
-				_serviceContext.getUserId(), _serviceContext.getScopeGroupId(),
-				_portal.getClassNameId(DDMStructure.class),
-				ddmStructure.getStructureId(), resourceClassNameId,
-				ddmTemplateJSONObject.getString("ddmTemplateKey"),
-				HashMapBuilder.put(
-					LocaleUtil.getSiteDefault(),
-					ddmTemplateJSONObject.getString("name")
-				).build(),
-				null, DDMTemplateConstants.TEMPLATE_TYPE_DISPLAY, null,
-				TemplateConstants.LANG_TYPE_FTL, _read("ddm_template.ftl", url),
-				false, false, null, null, _serviceContext);
-		}
-	}
-
-	private void _addDLFileEntries() throws Exception {
-		URL url = _bundle.getEntry("/images.zip");
-
-		if (url == null) {
-			throw new InitializationException(
-				"Unable to get entry '/images.zip'." + _bundle.getLocation());
-		}
-
-		File file = FileUtil.createTempFile(url.openStream());
-
-		_fileEntries = ImagesImporterUtil.importFile(
-			_serviceContext.getUserId(), _serviceContext.getScopeGroupId(),
-			file);
-	}
-
-	private void _addJournalArticles(List<JournalFolder> journalFolders)
-		throws Exception {
-
-		Map<String, String> fileEntriesMap = _getFileEntriesMap();
-
-		Map<String, Long> journalFolderMap = new HashMap<>();
-
-		for (JournalFolder journalFolder : journalFolders) {
-			journalFolderMap.put(
-				journalFolder.getName(), journalFolder.getFolderId());
-		}
-
-		Enumeration<URL> enumeration = _bundle.findEntries(
-			_PATH + "/journal-articles", "journal_article.json", true);
-
-		while (enumeration.hasMoreElements()) {
-			URL url = enumeration.nextElement();
-
-			String content = StringUtil.read(url.openStream());
-
-			JSONObject journalArticleJSONObject =
-				JSONFactoryUtil.createJSONObject(content);
-
-			List<String> assetTagNames = new ArrayList<>();
-
-			JSONArray assetTagNamesJSONArray =
-				journalArticleJSONObject.getJSONArray("tags");
-
-			if (assetTagNamesJSONArray != null) {
-				for (int i = 0; i < assetTagNamesJSONArray.length(); i++) {
-					assetTagNames.add(assetTagNamesJSONArray.getString(i));
-				}
-			}
-
-			_serviceContext.setAssetTagNames(
-				assetTagNames.toArray(new String[0]));
-
-			Calendar calendar = CalendarFactoryUtil.getCalendar(
-				_serviceContext.getTimeZone());
-
-			int displayDateMonth = calendar.get(Calendar.MONTH);
-			int displayDateDay = calendar.get(Calendar.DAY_OF_MONTH);
-			int displayDateYear = calendar.get(Calendar.YEAR);
-			int displayDateHour = calendar.get(Calendar.HOUR_OF_DAY);
-			int displayDateMinute = calendar.get(Calendar.MINUTE);
-
-			Locale locale = _serviceContext.getLocale();
-
-			JournalArticle article = _journalArticleLocalService.addArticle(
-				_serviceContext.getUserId(), _serviceContext.getScopeGroupId(),
-				journalFolderMap.getOrDefault(
-					journalArticleJSONObject.getString("folder"),
-					JournalFolderConstants.DEFAULT_PARENT_FOLDER_ID),
-				JournalArticleConstants.CLASS_NAME_ID_DEFAULT, 0,
-				journalArticleJSONObject.getString("articleId"), false, 1,
-				HashMapBuilder.put(
-					locale, journalArticleJSONObject.getString("name")
-				).build(),
-				HashMapBuilder.put(
-					locale,
-					journalArticleJSONObject.getString("description", "")
-				).build(),
-				StringUtil.replace(
-					_read("journal_article.xml", url), "[$", "$]",
-					fileEntriesMap),
-				journalArticleJSONObject.getString("ddmStructureKey"),
-				journalArticleJSONObject.getString("ddmTemplateKey"), null,
-				displayDateMonth, displayDateDay, displayDateYear,
-				displayDateHour, displayDateMinute, 0, 0, 0, 0, 0, true, 0, 0,
-				0, 0, 0, true, true, false, null, null, null, null,
-				_serviceContext);
-
-			_serviceContext.setAssetTagNames(null);
-
-			long resourceClassNameId = _portal.getClassNameId(
-				JournalArticle.class);
-
-			DDMStructure ddmStructure = _fetchJournalDDMStructure(
-				journalArticleJSONObject.getString("ddmStructureKey"));
-
-			long defaultLayoutPageTemplateEntryId =
-				_getDefaultLayoutPageTemplateEntryId(
-					resourceClassNameId, ddmStructure.getStructureId());
-
-			_assetDisplayPageEntryLocalService.addAssetDisplayPageEntry(
-				_serviceContext.getUserId(), _serviceContext.getScopeGroupId(),
-				resourceClassNameId, article.getResourcePrimKey(),
-				defaultLayoutPageTemplateEntryId,
-				AssetDisplayPageConstants.TYPE_DEFAULT, _serviceContext);
-		}
-	}
-
-	private List<JournalFolder> _addJournalFolders() throws Exception {
-		List<JournalFolder> journalFolders = new ArrayList<>();
-
-		JSONArray journalFoldersJSONArray = JSONFactoryUtil.createJSONArray(
-			_read("/journal-folders/journal_folders.json"));
-
-		for (int i = 0; i < journalFoldersJSONArray.length(); i++) {
-			JSONObject jsonObject = journalFoldersJSONArray.getJSONObject(i);
-
-			JournalFolder journalFolder = _journalFolderLocalService.addFolder(
-				_serviceContext.getUserId(), _serviceContext.getScopeGroupId(),
-				JournalFolderConstants.DEFAULT_PARENT_FOLDER_ID,
-				jsonObject.getString("name"), null, _serviceContext);
-
-			journalFolders.add(journalFolder);
-		}
-
-		return journalFolders;
-	}
-
-	private void _addLayoutPageTemplateEntries() throws Exception {
-		List<KeyValuePair> pathKeyValuePairs = new ArrayList<>();
-
-		pathKeyValuePairs.add(
-			new KeyValuePair(
-				"display-page-templates",
-				LayoutPageTemplateExportImportConstants.
-					FILE_NAME_DISPLAY_PAGE_TEMPLATE));
-		pathKeyValuePairs.add(
-			new KeyValuePair(
-				"master-pages",
-				LayoutPageTemplateExportImportConstants.FILE_NAME_MASTER_PAGE));
-
-		Map<String, String> numberValuesMap = new HashMap<>();
-
-		List<DDMStructure> ddmStructures =
-			_ddmStructureLocalService.getStructures(
-				_serviceContext.getScopeGroupId(),
-				_portal.getClassNameId(JournalArticle.class.getName()));
-
-		for (DDMStructure ddmStructure : ddmStructures) {
-			numberValuesMap.put(
-				_getTokenFromName(ddmStructure.getStructureKey()),
-				String.valueOf(ddmStructure.getStructureId()));
-		}
-
-		Map<String, String> stringValuesMap = _getFileEntriesMap();
-
-		_siteNavigationMenuMap.forEach(
-			(String name, Long id) -> stringValuesMap.put(
-				_getTokenFromName(name), String.valueOf(id)));
-
-		_layoutNameURLMap.forEach(
-			(String name, String url) -> stringValuesMap.put(
-				"LAYOUT_URL_" + _getTokenFromName(name), url));
-
-		stringValuesMap.put(
-			"SCOPE_GROUP_ID",
-			String.valueOf(_serviceContext.getScopeGroupId()));
-
-		File file = _generateZipFile(
-			pathKeyValuePairs, numberValuesMap, stringValuesMap);
+		PrincipalThreadLocal.setName(String.valueOf(layout.getUserId()));
+		ServiceContextThreadLocal.pushServiceContext(serviceContext);
 
 		try {
-			_layoutPageTemplatesImporter.importFile(
-				_serviceContext.getUserId(), _serviceContext.getScopeGroupId(),
-				file, false);
-		}
-		catch (Exception e) {
-			_log.error(e);
-		}
-	}
+			_importPageElement(draftLayout, serviceContext);
 
-	private void _addLayouts() throws Exception {
-		try {
-			Map<String, String> resourcesMap = _getResourcesMap();
+			layout = _layoutCopyHelper.copyLayout(draftLayout, layout);
 
-			JSONArray layoutsJSONArray = JSONFactoryUtil.createJSONArray(
-				_read("/layouts/layouts.json"));
+			LayoutTypePortlet layoutTypePortlet =
+				(LayoutTypePortlet)layout.getLayoutType();
 
-			for (int i = 0; i < layoutsJSONArray.length(); i++) {
-				JSONObject jsonObject = layoutsJSONArray.getJSONObject(i);
+			layoutTypePortlet.setLayoutTemplateId(
+				0, PropsValues.DEFAULT_GUEST_PUBLIC_LAYOUT_TEMPLATE_ID, false);
 
-				String path = jsonObject.getString("path");
+			_layoutLocalService.updateLayout(
+				layout.getGroupId(), layout.isPrivateLayout(),
+				layout.getLayoutId(), layout.getTypeSettings());
 
-				JSONObject pageJSONObject = JSONFactoryUtil.createJSONObject(
-					_read(
-						StringBundler.concat(
-							"/layouts/", path, StringPool.SLASH, "page.json")));
+			_layoutLocalService.updatePriority(
+				layout.getPlid(), LayoutConstants.FIRST_PRIORITY);
 
-				String type = StringUtil.toLowerCase(
-					pageJSONObject.getString("type"));
+			_layoutLocalService.updateStatus(
+				layout.getUserId(), layout.getPlid(),
+				WorkflowConstants.STATUS_APPROVED, serviceContext);
 
-				Layout layout = null;
+			_layoutLocalService.updateStatus(
+				layout.getUserId(), draftLayout.getPlid(),
+				WorkflowConstants.STATUS_APPROVED, serviceContext);
 
-				if (Objects.equals(LayoutConstants.TYPE_CONTENT, type) ||
-					Objects.equals(LayoutConstants.TYPE_COLLECTION, type)) {
+			boolean updateLayoutSet = false;
 
-					String pageDefinitionJSON = StringUtil.replace(
-						_read(
-							StringBundler.concat(
-								"/layouts/", path, "/page-definition.json")),
-						"[$", "$]", resourcesMap);
+			LayoutSet layoutSet = layout.getLayoutSet();
 
-					layout = _addContentLayout(
-						pageJSONObject,
-						JSONFactoryUtil.createJSONObject(pageDefinitionJSON),
-						resourcesMap);
-				}
-				else {
-					layout = _addWidgetLayout(pageJSONObject);
-				}
+			if (Validator.isNotNull(
+					PropsValues.DEFAULT_GUEST_PUBLIC_LAYOUT_REGULAR_THEME_ID)) {
 
-				_addNavigationMenuItems(layout);
+				layoutSet.setThemeId(
+					PropsValues.DEFAULT_GUEST_PUBLIC_LAYOUT_REGULAR_THEME_ID);
+
+				updateLayoutSet = true;
+			}
+
+			if (Validator.isNotNull(
+					PropsValues.
+						DEFAULT_GUEST_PUBLIC_LAYOUT_REGULAR_COLOR_SCHEME_ID)) {
+
+				layoutSet.setColorSchemeId(
+					PropsValues.
+						DEFAULT_GUEST_PUBLIC_LAYOUT_REGULAR_COLOR_SCHEME_ID);
+
+				updateLayoutSet = true;
+			}
+
+			if (updateLayoutSet) {
+				_layoutSetLocalService.updateLayoutSet(layoutSet);
 			}
 		}
-		catch (IOException ioe) {
-			_log.error(ioe.getMessage());
+		catch (Exception exception) {
+			throw new PortalException(exception);
+		}
+		finally {
+			PrincipalThreadLocal.setName(currentName);
+			ServiceContextThreadLocal.pushServiceContext(currentServiceContext);
 		}
 	}
 
-	private void _addNavigationMenuItems(Layout layout) throws Exception {
-		if (layout == null) {
-			return;
-		}
-
-		List<SiteNavigationMenu> siteNavigationMenus =
-			_layoutsSiteNavigationMenuMap.get(
-				StringUtil.toLowerCase(
-					layout.getName(LocaleUtil.getSiteDefault())));
-
-		if (ListUtil.isEmpty(siteNavigationMenus)) {
-			return;
-		}
-
-		SiteNavigationMenuItemType siteNavigationMenuItemType =
-			_siteNavigationMenuItemTypeRegistry.getSiteNavigationMenuItemType(
-				SiteNavigationMenuItemTypeConstants.LAYOUT);
-
-		for (SiteNavigationMenu siteNavigationMenu : siteNavigationMenus) {
-			_siteNavigationMenuItemLocalService.addSiteNavigationMenuItem(
-				_serviceContext.getUserId(), _serviceContext.getScopeGroupId(),
-				siteNavigationMenu.getSiteNavigationMenuId(), 0,
-				SiteNavigationMenuItemTypeConstants.LAYOUT,
-				siteNavigationMenuItemType.getTypeSettingsFromLayout(layout),
-				_serviceContext);
-		}
-	}
-
-	private void _addSiteNavigationMenus() throws Exception {
-		_layoutsSiteNavigationMenuMap = new HashMap<>();
-		_siteNavigationMenuMap = new HashMap<>();
-
-		JSONArray siteNavigationMenuJSONArray = JSONFactoryUtil.createJSONArray(
-			_read("/site-navigation-menus/site-navigation-menus.json"));
-
-		for (int i = 0; i < siteNavigationMenuJSONArray.length(); i++) {
-			JSONObject jsonObject = siteNavigationMenuJSONArray.getJSONObject(
-				i);
-
-			String name = jsonObject.getString("name");
-
-			SiteNavigationMenu siteNavigationMenu =
-				_siteNavigationMenuLocalService.addSiteNavigationMenu(
-					_serviceContext.getUserId(),
-					_serviceContext.getScopeGroupId(), name, _serviceContext);
-
-			_siteNavigationMenuMap.put(
-				name, siteNavigationMenu.getSiteNavigationMenuId());
-
-			JSONArray pagesJSONArray = jsonObject.getJSONArray("pages");
-
-			for (int j = 0; j < pagesJSONArray.length(); j++) {
-				List<SiteNavigationMenu> siteNavigationMenus =
-					_layoutsSiteNavigationMenuMap.computeIfAbsent(
-						pagesJSONArray.getString(j), key -> new ArrayList<>());
-
-				siteNavigationMenus.add(siteNavigationMenu);
-			}
-		}
-	}
-
-	private void _addStyleBookEntries() throws Exception {
-		URL url = _bundle.getEntry("/style-books.zip");
-
-		File file = FileUtil.createTempFile(url.openStream());
-
-		StyleBookEntriesImporterUtil.importStyleBookEntries(
-			_serviceContext.getUserId(), _serviceContext.getScopeGroupId(),
-			file, false);
-	}
-
-	private Layout _addWidgetLayout(JSONObject jsonObject) throws Exception {
-		String name = jsonObject.getString("name");
-
-		return _layoutLocalService.addLayout(
-			_serviceContext.getUserId(), _serviceContext.getScopeGroupId(),
-			false, LayoutConstants.DEFAULT_PARENT_LAYOUT_ID,
-			HashMapBuilder.put(
-				LocaleUtil.getSiteDefault(), name
-			).build(),
-			new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(),
-			LayoutConstants.TYPE_PORTLET, null, false, false, new HashMap<>(),
-			_serviceContext);
-	}
-
-	private void _addWidgetTemplates() throws Exception {
-		Enumeration<URL> enumeration = _bundle.findEntries(
-			_PATH + "/widget-templates", "ddm_template.json", true);
-
-		while (enumeration.hasMoreElements()) {
-			URL url = enumeration.nextElement();
-
-			JSONObject ddmTemplateJSONObject = JSONFactoryUtil.createJSONObject(
-				StringUtil.read(url.openStream()));
-
-			long classNameId = _portal.getClassNameId(
-				ddmTemplateJSONObject.getString("className"));
-
-			_ddmTemplateLocalService.addTemplate(
-				_serviceContext.getUserId(), _serviceContext.getScopeGroupId(),
-				classNameId, 0,
-				_portal.getClassNameId(PortletDisplayTemplate.class),
-				ddmTemplateJSONObject.getString("ddmTemplateKey"),
-				HashMapBuilder.put(
-					LocaleUtil.getSiteDefault(),
-					ddmTemplateJSONObject.getString("name")
-				).build(),
-				null, DDMTemplateConstants.TEMPLATE_TYPE_DISPLAY, null,
-				TemplateConstants.LANG_TYPE_FTL, _read("ddm_template.ftl", url),
-				false, false, null, null, _serviceContext);
-		}
-	}
-
-	private void _addZipWriterEntry(
-			ZipWriter zipWriter, URL url, Map<String, String> numberValuesMap,
-			Map<String, String> stringValuesMap)
+	private long _getTreeImageId(
+			long groupId, long userId, long plid, ServiceContext serviceContext)
 		throws Exception {
 
-		if (_isReplaceableTokenFileExtension(url)) {
-			String content = StringUtil.read(url.openStream());
+		Repository repository = _portletFileRepository.fetchPortletRepository(
+			groupId, Layout.class.getName());
 
-			content = StringUtil.replace(
-				content, "\"[£", "£]\"", numberValuesMap);
+		if (repository == null) {
+			serviceContext.setAddGroupPermissions(true);
+			serviceContext.setAddGuestPermissions(true);
 
-			content = StringUtil.replace(content, "[$", "$]", stringValuesMap);
-
-			zipWriter.addEntry(
-				StringUtil.removeSubstring(url.getPath(), _PATH), content);
-		}
-		else {
-			zipWriter.addEntry(
-				StringUtil.removeSubstring(url.getPath(), _PATH),
-				url.openStream());
-		}
-	}
-
-	private void _createLayoutNameURLMap() throws Exception {
-		try {
-			JSONArray layoutsJSONArray = JSONFactoryUtil.createJSONArray(
-				_read("/layouts/layouts.json"));
-
-			_layoutNameURLMap = new HashMap<>();
-
-			for (int i = 0; i < layoutsJSONArray.length(); i++) {
-				JSONObject jsonObject = layoutsJSONArray.getJSONObject(i);
-
-				String path = jsonObject.getString("path");
-
-				JSONObject pageJSONObject = JSONFactoryUtil.createJSONObject(
-					_read(
-						StringBundler.concat(
-							"/layouts/", path, StringPool.SLASH, "page.json")));
-
-				String layoutName = pageJSONObject.getString("name");
-
-				_layoutNameURLMap.put(
-					layoutName,
-					_getFriendlyURL(
-						layoutName, pageJSONObject.getBoolean("private")));
-			}
-		}
-		catch (IOException ioe) {
-			_log.error(ioe.getMessage());
-		}
-	}
-
-	private void _createServiceContext(long groupId) throws Exception {
-		ServiceContext serviceContext = new ServiceContext();
-
-		serviceContext.setAddGroupPermissions(true);
-		serviceContext.setAddGuestPermissions(true);
-
-		Locale locale = LocaleUtil.getSiteDefault();
-
-		serviceContext.setLanguageId(LanguageUtil.getLanguageId(locale));
-
-		serviceContext.setScopeGroupId(groupId);
-
-		User user = _userLocalService.getUser(PrincipalThreadLocal.getUserId());
-
-		serviceContext.setTimeZone(user.getTimeZone());
-		serviceContext.setUserId(user.getUserId());
-
-		_serviceContext = serviceContext;
-	}
-
-	private DDMStructure _fetchDDMStructure(
-		String ddmStructureKey, long resourceClassNameId) {
-
-		return _ddmStructureLocalService.fetchStructure(
-			_serviceContext.getScopeGroupId(), resourceClassNameId,
-			ddmStructureKey);
-	}
-
-	private DDMStructure _fetchJournalDDMStructure(String ddmStructureKey) {
-		return _fetchDDMStructure(
-			ddmStructureKey, _portal.getClassNameId(JournalArticle.class));
-	}
-
-	private File _generateZipFile(
-			List<KeyValuePair> pathKeyValuePairs,
-			Map<String, String> numberValuesMap,
-			Map<String, String> stringValuesMap)
-		throws Exception {
-
-		ZipWriter zipWriter = ZipWriterFactoryUtil.getZipWriter();
-
-		for (KeyValuePair pathKeyValuePair : pathKeyValuePairs) {
-			StringBuilder sb = new StringBuilder(3);
-
-			sb.append(
-				_PATH + StringPool.FORWARD_SLASH + pathKeyValuePair.getKey());
-			sb.append(StringPool.FORWARD_SLASH);
-
-			Enumeration<URL> enumeration = _bundle.findEntries(
-				sb.toString(), pathKeyValuePair.getValue(), true);
-
-			if (enumeration == null) {
-				continue;
-			}
-
-			while (enumeration.hasMoreElements()) {
-				URL url = enumeration.nextElement();
-
-				_populateZipWriter(
-					zipWriter, url, numberValuesMap, stringValuesMap);
-			}
+			repository = _portletFileRepository.addPortletRepository(
+				groupId, Layout.class.getName(), serviceContext);
 		}
 
-		return zipWriter.getFile();
-	}
+		FileEntry fileEntry = _portletFileRepository.fetchPortletFileEntry(
+			groupId, repository.getDlFolderId(), _FILE_NAME_TREE_IMAGE);
 
-	private long _getDefaultLayoutPageTemplateEntryId(
-		long classNameId, long classTypeId) {
-
-		LayoutPageTemplateEntry defaultAssetDisplayPage =
-			_layoutPageTemplateEntryService.fetchDefaultLayoutPageTemplateEntry(
-				_serviceContext.getScopeGroupId(), classNameId, classTypeId);
-
-		if (defaultAssetDisplayPage == null) {
-			return 0;
+		if (fileEntry != null) {
+			_portletFileRepository.deletePortletFileEntry(
+				fileEntry.getFileEntryId());
 		}
 
-		return defaultAssetDisplayPage.getLayoutPageTemplateEntryId();
-	}
+		URL url = _bundle.getEntry(_PATH + _FILE_NAME_TREE_IMAGE);
 
-	private String _getDynamicCollectionTypeSettings(
-			String ddmStructureKey, long classNameId, String[] assetTagNames)
-		throws Exception {
+		byte[] bytes = null;
 
-		UnicodeProperties unicodeProperties = new UnicodeProperties(true);
-
-		unicodeProperties.put("anyAssetType", String.valueOf(classNameId));
-
-		DDMStructure ddmStructure = _fetchDDMStructure(
-			ddmStructureKey, classNameId);
-
-		unicodeProperties.put(
-			"anyClassTypeJournalArticleAssetRendererFactory",
-			String.valueOf(ddmStructure.getStructureId()));
-
-		unicodeProperties.put("classNameIds", String.valueOf(classNameId));
-		unicodeProperties.put(
-			"classTypeIdsJournalArticleAssetRendererFactory",
-			String.valueOf(ddmStructure.getStructureId()));
-		unicodeProperties.put(
-			"groupIds", String.valueOf(_serviceContext.getScopeGroupId()));
-		unicodeProperties.put("orderByColumn1", "modifiedDate");
-		unicodeProperties.put("orderByColumn2", "title");
-		unicodeProperties.put("orderByType1", "ASC");
-		unicodeProperties.put("orderByType2", "ASC");
-
-		if (ArrayUtil.isNotEmpty(assetTagNames)) {
-			for (int i = 0; i < assetTagNames.length; i++) {
-				unicodeProperties.put("queryAndOperator" + i, "true");
-				unicodeProperties.put("queryContains" + i, "true");
-				unicodeProperties.put("queryName" + i, "assetTags");
-				unicodeProperties.put("queryValues" + i, assetTagNames[i]);
-			}
+		try (InputStream inputStream = url.openStream()) {
+			bytes = FileUtil.getBytes(inputStream);
 		}
 
-		return unicodeProperties.toString();
+		fileEntry = _portletFileRepository.addPortletFileEntry(
+			groupId, userId, Layout.class.getName(), plid,
+			Layout.class.getName(), repository.getDlFolderId(), bytes,
+			_FILE_NAME_TREE_IMAGE,
+			MimeTypesUtil.getContentType(_FILE_NAME_TREE_IMAGE), false);
+
+		return fileEntry.getFileEntryId();
 	}
 
-	private Map<String, String> _getFileEntriesMap() throws Exception {
-		Map<String, String> fileEntriesMap = new HashMap<>();
+	private User _getUser(long companyId) throws PortalException {
+		Role role = _roleLocalService.fetchRole(
+			companyId, RoleConstants.ADMINISTRATOR);
 
-		for (FileEntry fileEntry : _fileEntries) {
-			JSONObject jsonObject = JSONFactoryUtil.createJSONObject(
-				JSONFactoryUtil.looseSerialize(fileEntry));
-
-			jsonObject.put("alt", StringPool.BLANK);
-
-			fileEntriesMap.put(
-				"JSON_" + fileEntry.getFileName(), jsonObject.toString());
-
-			fileEntriesMap.put(
-				"URL_" + fileEntry.getFileName(),
-				_dlURLHelper.getPreviewURL(
-					fileEntry, fileEntry.getFileVersion(), null,
-					StringPool.BLANK, false, false));
+		if (role == null) {
+			return _userLocalService.getDefaultUser(companyId);
 		}
 
-		return fileEntriesMap;
-	}
+		List<User> adminUsers = _userLocalService.getRoleUsers(
+			role.getRoleId(), 0, 1);
 
-	private String _getFriendlyURL(String layoutName, Boolean privateLayout)
-		throws Exception {
-
-		if (privateLayout) {
-			return _getPrivateFriendlyURL(layoutName);
+		if (adminUsers.isEmpty()) {
+			return _userLocalService.getDefaultUser(companyId);
 		}
 
-		return _getPublicFriendlyURL(layoutName);
+		return adminUsers.get(0);
 	}
 
-	private String _getKeyFromName(String name) {
-		String key = StringUtil.toLowerCase(name);
-
-		return StringUtil.replace(key, StringPool.SPACE, StringPool.DASH);
-	}
-
-	private String _getPrivateFriendlyURL(String layoutName) throws Exception {
-		Group scopeGroup = _serviceContext.getScopeGroup();
-
-		return StringBundler.concat(
-			_portal.getPathFriendlyURLPrivateGroup(),
-			scopeGroup.getFriendlyURL(), StringPool.FORWARD_SLASH, layoutName);
-	}
-
-	private String _getPublicFriendlyURL(String layoutName) throws Exception {
-		Group scopeGroup = _serviceContext.getScopeGroup();
-
-		return StringBundler.concat(
-			_portal.getPathFriendlyURLPublic(), scopeGroup.getFriendlyURL(),
-			StringPool.FORWARD_SLASH, layoutName);
-	}
-
-	private Map<String, String> _getResourcesMap() throws Exception {
-		Map<String, String> resourcesMap = _getFileEntriesMap();
-
-		List<JournalArticle> articles = _journalArticleLocalService.getArticles(
-			_serviceContext.getScopeGroupId());
-
-		for (JournalArticle article : articles) {
-			resourcesMap.put(
-				article.getArticleId(),
-				String.valueOf(article.getResourcePrimKey()));
-		}
-
-		List<AssetListEntry> assetListEntries =
-			_assetListEntryLocalService.getAssetListEntries(
-				_serviceContext.getScopeGroupId());
-
-		for (AssetListEntry assetListEntry : assetListEntries) {
-			resourcesMap.put(
-				StringUtil.toUpperCase(assetListEntry.getAssetListEntryKey()),
-				String.valueOf(assetListEntry.getAssetListEntryId()));
-		}
-
-		return resourcesMap;
-	}
-
-	private String _getThemeId(long companyId, String themeName) {
-		List<Theme> themes = ListUtil.filter(
-			_themeLocalService.getThemes(companyId),
-			theme -> Objects.equals(theme.getName(), themeName));
-
-		if (ListUtil.isNotEmpty(themes)) {
-			Theme theme = themes.get(0);
-
-			return theme.getThemeId();
-		}
-
-		return null;
-	}
-
-	private String _getTokenFromName(String name) {
-		String token = StringUtil.toUpperCase(name);
-
-		token = StringUtil.trim(token);
-
-		token = StringUtil.replace(
-			token, StringPool.SPACE, StringPool.UNDERLINE);
-
-		return token;
-	}
-
-	private void _importPageDefinition(
-		Layout draftLayout, JSONObject pageDefinitionJSONObject) {
-
-		if (!pageDefinitionJSONObject.has("pageElement")) {
-			return;
-		}
-
-		JSONObject jsonObject = pageDefinitionJSONObject.getJSONObject(
-			"pageElement");
-
-		String type = jsonObject.getString("type");
-
-		if (Validator.isNull(type) || !Objects.equals(type, "Root")) {
-			return;
-		}
-
-		LayoutPageTemplateStructure layoutPageTemplateStructure;
+	private void _importPageElement(
+			Layout layout, ServiceContext serviceContext)
+		throws PortalException {
 
 		try {
-			layoutPageTemplateStructure =
+			LayoutPageTemplateStructure layoutPageTemplateStructure =
 				_layoutPageTemplateStructureLocalService.
 					fetchLayoutPageTemplateStructure(
-						draftLayout.getGroupId(), draftLayout.getPlid(), true);
-		}
-		catch (PortalException pe) {
-			_log.error(pe);
+						layout.getGroupId(), layout.getPlid(), true);
 
-			return;
-		}
+			LayoutStructure layoutStructure = LayoutStructure.of(
+				layoutPageTemplateStructure.getData(
+					SegmentsExperienceConstants.ID_DEFAULT));
 
-		LayoutStructure layoutStructure = LayoutStructure.of(
-			layoutPageTemplateStructure.getData(
-				SegmentsExperienceConstants.ID_DEFAULT));
+			Class<?> clazz = getClass();
 
-		JSONArray pageElementsJSONArray = jsonObject.getJSONArray(
-			"pageElements");
+			String pageElementJSON = StringUtil.replace(
+				StringUtil.read(
+					clazz.getClassLoader(), _PATH + "page-element.json"),
+				"\"[£", "£]\"",
+				HashMapBuilder.put(
+					"WELCOME_TO_LIFERAY_I18N_JSON_VALUE",
+					() -> {
+						JSONObject jsonObject =
+							JSONFactoryUtil.createJSONObject();
 
-		for (int j = 0; j < pageElementsJSONArray.length(); j++) {
-			try {
-				_layoutPageTemplatesImporter.importPageElement(
-					draftLayout, layoutStructure,
-					layoutStructure.getMainItemId(),
-					pageElementsJSONArray.getString(j), j);
+						Set<Locale> locales = new HashSet<>(
+							LanguageUtil.getAvailableLocales());
+
+						for (Locale locale : locales) {
+							jsonObject.put(
+								LocaleUtil.toLanguageId(locale),
+								LanguageUtil.get(locale, "welcome-to-liferay"));
+						}
+
+						return jsonObject.toJSONString();
+					}
+				).build());
+
+			String releaseInfo = StringPool.BLANK;
+
+			if (_HTTP_HEADER_VERSION_VERBOSITY_PARTIAL) {
+				releaseInfo = ReleaseInfo.getName();
 			}
-			catch (Exception e) {
-				_log.error(e);
-			}
-		}
-	}
-
-	private boolean _isReplaceableTokenFileExtension(URL url) {
-		String filePath = url.getPath();
-
-		int index = filePath.lastIndexOf(".");
-
-		String extension = filePath.substring(index);
-
-		return ArrayUtil.contains(_REPLACEABLE_TOKEN_FILE_EXTENSION, extension);
-	}
-
-	private void _populateZipWriter(
-			ZipWriter zipWriter, URL url, Map<String, String> numberValuesMap,
-			Map<String, String> stringValuesMap)
-		throws Exception {
-
-		zipWriter.addEntry(
-			StringUtil.removeSubstring(url.getFile(), _PATH), url.openStream());
-
-		Enumeration<URL> enumeration = _bundle.findEntries(
-			FileUtil.getPath(url.getPath()), StringPool.STAR, true);
-
-		while (enumeration.hasMoreElements()) {
-			_addZipWriterEntry(
-				zipWriter, enumeration.nextElement(), numberValuesMap,
-				stringValuesMap);
-		}
-	}
-
-	private String _read(String fileName) throws IOException {
-		Class<?> clazz = getClass();
-
-		return StringUtil.read(clazz.getClassLoader(), _PATH + fileName);
-	}
-
-	private String _read(String fileName, URL url) throws Exception {
-		String path = url.getPath();
-
-		URL entryURL = _bundle.getEntry(
-			path.substring(0, path.lastIndexOf("/") + 1) + fileName);
-
-		return StringUtil.read(entryURL.openStream());
-	}
-
-	private void _setDefaultLayoutPageTemplateEntries() {
-		try {
-			JSONArray defaultTemplatesJSONArray =
-				JSONFactoryUtil.createJSONArray(
-					_read(
-						"/display-page-templates" +
-							"/default-display-page-templates.json"));
-
-			for (int i = 0; i < defaultTemplatesJSONArray.length(); i++) {
-				JSONObject jsonObject = defaultTemplatesJSONArray.getJSONObject(
-					i);
-
-				String key = _getKeyFromName(jsonObject.getString("name"));
-
-				LayoutPageTemplateEntry layoutPageTemplateEntry =
-					_layoutPageTemplateEntryLocalService.
-						fetchLayoutPageTemplateEntry(
-							_serviceContext.getScopeGroupId(), key);
-
-				if (layoutPageTemplateEntry == null) {
-					_log.error("No template exists with the key: " + key + ".");
-				}
-				else {
-					_layoutPageTemplateEntryLocalService.
-						updateLayoutPageTemplateEntry(
-							layoutPageTemplateEntry.
-								getLayoutPageTemplateEntryId(),
-							true);
-				}
-			}
-		}
-		catch (Exception e) {
-			_log.error(e.getMessage());
-		}
-	}
-
-	private void _setDefaultStyleBookEntry() {
-		try {
-			String styleBooks = _read("/style-books/style-books.json");
-
-			JSONObject styleBooksJSONObject = JSONFactoryUtil.createJSONObject(
-				styleBooks);
-
-			String styleBookEntryKey = styleBooksJSONObject.getString(
-				"defaultStyleBook");
-
-			StyleBookEntry styleBookEntry =
-				_styleBookEntryLocalService.fetchStyleBookEntry(
-					_serviceContext.getScopeGroupId(), styleBookEntryKey);
-
-			if (styleBookEntry != null) {
-				_styleBookEntryLocalService.updateDefaultStyleBookEntry(
-					styleBookEntry.getStyleBookEntryId(), true);
-			}
-		}
-		catch (Exception e) {
-			_log.error(e.getMessage());
-		}
-	}
-
-	private Layout _updateLayoutTypeSettings(
-		Layout layout, JSONObject settingsJSONObject) {
-
-		if (settingsJSONObject == null) {
-			return layout;
-		}
-
-		UnicodeProperties unicodeProperties =
-			layout.getTypeSettingsProperties();
-
-		JSONObject themeSettingsJSONObject = settingsJSONObject.getJSONObject(
-			"themeSettings");
-
-		Set<Map.Entry<String, String>> entrySet = unicodeProperties.entrySet();
-
-		entrySet.removeIf(
-			entry -> {
-				String key = entry.getKey();
-
-				return key.startsWith("lfr-theme:");
-			});
-
-		if (themeSettingsJSONObject != null) {
-			for (String key : themeSettingsJSONObject.keySet()) {
-				unicodeProperties.put(
-					key, themeSettingsJSONObject.getString(key));
+			else if (!_HTTP_HEADER_VERSION_VERBOSITY_DEFAULT) {
+				releaseInfo = ReleaseInfo.getReleaseInfo();
 			}
 
-			layout.setTypeSettingsProperties(unicodeProperties);
+			releaseInfo = StringUtil.replace(
+				releaseInfo, CharPool.OPEN_PARENTHESIS, "<br>(");
+
+			pageElementJSON = StringUtil.replace(
+				pageElementJSON, "[$", "$]",
+				HashMapBuilder.put(
+					"RELEASE_INFO", releaseInfo + "."
+				).put(
+					"TREE_IMAGE_ID",
+					String.valueOf(
+						_getTreeImageId(
+							layout.getGroupId(), layout.getUserId(),
+							layout.getPlid(), serviceContext))
+				).build());
+
+			_layoutPageTemplatesImporter.importPageElement(
+				layout, layoutStructure, layoutStructure.getMainItemId(),
+				pageElementJSON, 0);
 		}
-
-		String themeName = settingsJSONObject.getString("themeName");
-
-		if (Validator.isNotNull(themeName)) {
-			String themeId = _getThemeId(layout.getCompanyId(), themeName);
-
-			layout.setThemeId(themeId);
+		catch (Exception exception) {
+			throw new PortalException(exception);
 		}
-
-		String colorSchemeName = settingsJSONObject.getString(
-			"colorSchemeName");
-
-		if (Validator.isNotNull(colorSchemeName)) {
-			layout.setColorSchemeId(colorSchemeName);
-		}
-
-		String css = settingsJSONObject.getString("css");
-
-		if (Validator.isNotNull(css)) {
-			layout.setCss(css);
-		}
-
-		JSONObject masterPageJSONObject = settingsJSONObject.getJSONObject(
-			"masterPage");
-
-		if (masterPageJSONObject != null) {
-			String key = masterPageJSONObject.getString("key");
-
-			LayoutPageTemplateEntry masterLayoutPageTemplateEntry =
-				_layoutPageTemplateEntryLocalService.
-					fetchLayoutPageTemplateEntry(layout.getGroupId(), key);
-
-			if (masterLayoutPageTemplateEntry == null) {
-				_log.error(
-					"Unable to find a master page with the key, " + key +
-						". The key should be the name of the master page, " +
-							"lowercased with dashes replacing spaces.");
-			}
-			else {
-				layout.setMasterLayoutPlid(
-					masterLayoutPageTemplateEntry.getPlid());
-			}
-		}
-
-		return _layoutLocalService.updateLayout(layout);
 	}
+
+	private static final String _FILE_NAME_TREE_IMAGE = "tree.png";
+
+	private static final boolean _HTTP_HEADER_VERSION_VERBOSITY_DEFAULT =
+		StringUtil.equalsIgnoreCase(
+			PropsValues.HTTP_HEADER_VERSION_VERBOSITY, "off");
+
+	private static final boolean _HTTP_HEADER_VERSION_VERBOSITY_PARTIAL =
+		StringUtil.equalsIgnoreCase(
+			PropsValues.HTTP_HEADER_VERSION_VERBOSITY, "partial");
 
 	private static final String _PATH =
-		"com/liferay/site/se/site/initializer/internal/dependencies";
-
-	private static final String[] _REPLACEABLE_TOKEN_FILE_EXTENSION = {
-		".ftl", ".json", ".xml"
-	};
+		"com/liferay/site/se/site/initializer/internal/dependencies/";
 
 	private static final Log _log = LogFactoryUtil.getLog(
 		SESiteInitializer.class);
 
-	@Reference
-	private AssetDisplayPageEntryLocalService
-		_assetDisplayPageEntryLocalService;
-
-	@Reference
-	private AssetListEntryLocalService _assetListEntryLocalService;
-
 	private Bundle _bundle;
 
 	@Reference
-	private DDMStructureLocalService _ddmStructureLocalService;
-
-	@Reference
-	private DDMTemplateLocalService _ddmTemplateLocalService;
-
-	@Reference
-	private DefaultDDMStructureHelper _defaultDDMStructureHelper;
-
-	@Reference
-	private DLURLHelper _dlURLHelper;
-
-	private List<FileEntry> _fileEntries;
-
-	@Reference
-	private JournalArticleLocalService _journalArticleLocalService;
-
-	@Reference
-	private JournalFolderLocalService _journalFolderLocalService;
+	private GroupLocalService _groupLocalService;
 
 	@Reference
 	private LayoutCopyHelper _layoutCopyHelper;
 
 	@Reference
 	private LayoutLocalService _layoutLocalService;
-
-	private Map<String, String> _layoutNameURLMap;
-
-	@Reference
-	private LayoutPageTemplateEntryLocalService
-		_layoutPageTemplateEntryLocalService;
-
-	@Reference
-	private LayoutPageTemplateEntryLocalService _layoutPageTemplateEntryService;
 
 	@Reference
 	private LayoutPageTemplatesImporter _layoutPageTemplatesImporter;
@@ -1226,36 +386,19 @@ public class SESiteInitializer implements SiteInitializer {
 	private LayoutPageTemplateStructureLocalService
 		_layoutPageTemplateStructureLocalService;
 
-	private Map<String, List<SiteNavigationMenu>> _layoutsSiteNavigationMenuMap;
+	@Reference
+	private LayoutSetLocalService _layoutSetLocalService;
 
 	@Reference
-	private Portal _portal;
+	private PortletFileRepository _portletFileRepository;
 
-	private ServiceContext _serviceContext;
+	@Reference
+	private RoleLocalService _roleLocalService;
 
 	@Reference(
 		target = "(osgi.web.symbolicname=com.liferay.site.se.site.initializer)"
 	)
 	private ServletContext _servletContext;
-
-	@Reference
-	private SiteNavigationMenuItemLocalService
-		_siteNavigationMenuItemLocalService;
-
-	@Reference
-	private SiteNavigationMenuItemTypeRegistry
-		_siteNavigationMenuItemTypeRegistry;
-
-	@Reference
-	private SiteNavigationMenuLocalService _siteNavigationMenuLocalService;
-
-	private Map<String, Long> _siteNavigationMenuMap;
-
-	@Reference
-	private StyleBookEntryLocalService _styleBookEntryLocalService;
-
-	@Reference
-	private ThemeLocalService _themeLocalService;
 
 	@Reference
 	private UserLocalService _userLocalService;
